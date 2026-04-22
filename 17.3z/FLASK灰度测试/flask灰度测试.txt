@@ -1,0 +1,73 @@
+from flask import Flask, request, jsonify
+import numpy as np
+
+import random
+
+import onnxruntime as ort
+import joblib
+from threading import Lock
+
+class SklearnModelSingleton:
+    _instance = None
+    _lock = Lock()
+
+    @classmethod
+    def get_instance(cls, model_path: str='/home/project/sk_model.pkl'):
+        #TODO
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance=joblib.load(model_path)
+        return cls._instance
+class ONNXModelSingleton:
+    _session = None
+    _lock = Lock()
+
+    @classmethod
+    def get_session(cls, model_path: str='/home/project/model.onnx'):
+        #TODO
+        if cls._session is None:
+            with cls._lock:
+                if cls._session is None:
+                    cls._session = ort.InferenceSession(model_path)
+        return cls._session
+
+app = Flask(__name__)
+
+@app.route("/predict", methods=["POST"])
+def predict():
+    #TODO
+    data = request.get_json()
+    features = data['features']
+    baseline_ratio=data['baseline_ratio']
+    new_ratio=data['new_ratio']
+
+    total_ratio=baseline_ratio+new_ratio
+    rand_val=random.random()*total_ratio
+    if rand_val<baseline_ratio:
+        route="baseline"
+        model=SklearnModelSingleton.get_instance()
+        pred = model.predict([features])[0]
+    else:
+        route="new"
+        session=ONNXModelSingleton.get_session()
+        input_name=session.get_inputs()[0].name
+        x = np.array([features],dtype=np.float32)
+        outputs=session.run(None,{input_name:x})
+        pred_output=outputs[0]
+        pred_output=np.array(pred_output)
+
+        if pred_output.ndim==0:
+            pred = pred_output.item()
+        elif pred_output.ndim==1:
+            pred=pred_output[0].item() if pred_output.shape[0]==1 else int(np.argmax(pred_output))
+        else:
+            pred=pred_output[0][0].item() if pred_output.shape[1] ==1 else int(np.argmax(pred_output[0]))
+    if isinstance(pred,np.generic):
+        pred=pred.item()
+    return jsonify({
+        "route":route,
+        "prediction":pred
+    })    
+if __name__ == '__main__':
+    app.run()

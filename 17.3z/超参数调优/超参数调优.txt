@@ -1,0 +1,57 @@
+import numpy as np
+from typing import Tuple, Dict
+from sklearn.datasets import make_classification
+from sklearn.model_selection import train_test_split, GridSearchCV, RandomizedSearchCV
+from sklearn.ensemble import GradientBoostingClassifier
+from sklearn import metrics
+
+def load_data_file(filename: str) -> Tuple[np.ndarray, np.ndarray]:
+    data = np.load(filename)
+    return data['X_train'], data['X_test'], data['y_train'], data['y_test']
+
+def tune_model(X_train, y_train) -> Tuple[GradientBoostingClassifier, Dict]:
+    #TODO
+    gbc = GradientBoostingClassifier(random_state=42)
+    para_grid={
+        "n_estimators":[100,150],
+        "learning_rate":[0.1,0.05,0.01],
+        "max_depth":[3,4,5]
+    }
+    grid_search=GridSearchCV(
+        estimator=gbc,
+        param_grid=para_grid,
+        cv=5,
+        scoring='accuracy',
+        n_jobs=-1
+    )
+    grid_search.fit(X_train,y_train)
+    return grid_search.best_estimator_,grid_search.best_params_
+   
+def evaluate_model(model, X_test, y_test) -> Dict[str, float]:
+    #TODO
+    y_pred=model.predict(X_test)
+    accuracy=metrics.accuracy_score(y_test,y_pred)
+    precision=metrics.precision_score(y_test,y_pred)
+    recall=metrics.recall_score(y_test,y_pred)
+    f1=metrics.f1_score(y_pred,y_test)
+
+    return {
+        "accuracy":float(accuracy),
+        "precision":float(precision),
+        "recall":float(recall),
+        "f1":float(f1)
+    }
+
+def main():
+    X_train, X_test, y_train, y_test = load_data_file('dataset.npz')
+
+    baseline_model = GradientBoostingClassifier(random_state=42)
+    baseline_model.fit(X_train, y_train)
+    baseline_metrics = evaluate_model(baseline_model, X_test, y_test)
+    print(baseline_metrics)
+    best_model, best_params = tune_model(X_train, y_train)
+    tuned_metrics = evaluate_model(best_model, X_test, y_test)
+    print(tuned_metrics)
+
+if __name__ == "__main__":
+    main()

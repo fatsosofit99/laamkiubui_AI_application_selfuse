@@ -1,0 +1,33 @@
+import joblib
+import numpy as np
+import onnxruntime as ort
+from skl2onnx import convert_sklearn
+from skl2onnx.common.data_types import FloatTensorType
+
+
+def convert_model_to_onnx(model_path: str, onnx_output_path: str) -> None:
+
+    #TODO
+    model=joblib.load(model_path)
+    initial_type = [('float_input', FloatTensorType([None, 4]))]
+    onnx = convert_sklearn(model, initial_types=initial_type)
+    with open(onnx_output_path,'wb') as f:
+        f.write(onnx.SerializeToString())
+def run_onnx_inference(onnx_path: str, X_input: np.ndarray) -> np.ndarray:
+    #TODO
+    session=ort.InferenceSession(onnx_path)
+    X_input=X_input.astype(np.float32)
+    input_name=session.get_inputs()[0].name
+    label_name=session.get_outputs()[0].name
+    result=session.run([label_name],{input_name:X_input})[0]
+    return np.array(result)
+if __name__ == '__main__':
+    model_path = "/home/project/mlp_model.joblib"
+    onnx_path = "/home/project/mlp_model.onnx"
+    np.random.seed(42)
+    X_sample = np.random.rand(20, 4)
+
+    convert_model_to_onnx(model_path, onnx_path)
+
+    onnx_output = run_onnx_inference(onnx_path, X_sample)
+    print("ONNX 推理输出：", onnx_output)

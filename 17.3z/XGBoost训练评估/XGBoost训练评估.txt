@@ -1,0 +1,49 @@
+import numpy as np
+import pandas as pd
+from typing import Tuple, Dict, List, Any
+from sklearn import metrics
+from sklearn.model_selection import KFold
+from xgboost import XGBClassifier
+
+
+def load_data(file_path: str) -> Tuple[np.ndarray, np.ndarray]:
+    df = pd.read_csv(file_path)
+    X = df.drop(columns=["label"]).values
+    y = df["label"].values
+    return X, y
+
+
+def train_and_predict(X_train: np.ndarray, y_train: np.ndarray, X_val: np.ndarray) -> Tuple[np.ndarray, XGBClassifier]:
+    #TODO
+    model=XGBClassifier()
+    model.fit(X_train,y_train)
+    y_pred = model.predict(X_val)
+    return y_pred,model
+
+def cross_validate(X: np.ndarray, y: np.ndarray, k: int = 5) -> List[Dict[str, Any]]:
+    #TODO
+    kf = KFold(n_splits=k,random_state=42,shuffle=True)
+    results=[]
+    for train_index,val_index in kf.split(X):
+        X_train,X_val=X[train_index],X[val_index]
+        y_train,y_val=y[train_index],y[val_index]
+
+        y_pred,model=train_and_predict(X_train=X_train,y_train=y_train,X_val=X_val)
+        f1=metrics.f1_score(y_val,y_pred)
+        res_dict={
+            "val_idx":val_index.tolist(),      # 验证集索引
+            "y_true":y_val.tolist(),       # 验证集真实标签
+            "y_pred":y_pred.tolist(),       # 模型预测结果
+            "f1": float(f1),               # 当前折的 F1 分数
+            "model":model     # 训练后的模型对象
+        }
+        results.append(res_dict)
+    results.sort(key=lambda x:x['f1'],reverse=True)
+    return results
+
+
+if __name__ == '__main__':
+    file_path = 'data.csv'
+    k = 5
+    X, y = load_data(file_path)
+    results = cross_validate(X, y, k)
